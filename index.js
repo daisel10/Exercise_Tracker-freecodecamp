@@ -1,6 +1,7 @@
 const express = require('express')
 const app = express()
 const cors = require('cors')
+const bodyParser = require('body-parser');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config()
 
@@ -11,21 +12,24 @@ const database = {
 };
 
 app.use(cors())
+app.use(express.json())
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'))
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
 });
-
 app.post('/api/users', (req, res) => {
+
   const { username } = req.body;
 
-  // Verificar si el usuario ya existe
+
+  // Check if the username is already taken
   const existingUser = database.users.find(user => user.username === username);
   if (existingUser) {
     return res.send('Username already exists');
   }
 
-  // Crear nuevo usuario
+  // Create a new user
   const newUser = {
     username,
     _id: generateId()
@@ -36,20 +40,21 @@ app.post('/api/users', (req, res) => {
   res.json({ username: newUser.username, _id: newUser._id });
 });
 
-app.get('/api/exercise/users', (req, res) => {
+app.get('/api/users', (req, res) => {
   res.json(database.users);
 });
 
-app.post('/api/exercise/add', (req, res) => {
-  const { userId, description, duration, date } = req.body;
+app.post('/api/users/:_id/exercises', (req, res) => {
+  const { _id } = req.params;
+  const { description, duration, date } = req.body;
 
-  // Verificar si el usuario existe
-  const user = database.users.find(user => user._id === userId);
+  // Check if the user exists
+  const user = database.users.find(user => user._id === _id);
   if (!user) {
     return res.send('User not found');
   }
 
-  // Crear nuevo ejercicio
+  // Create a new exercise
   const newExercise = {
     username: user.username,
     description,
@@ -65,22 +70,23 @@ app.post('/api/exercise/add', (req, res) => {
     description: newExercise.description,
     duration: newExercise.duration,
     date: newExercise.date.toDateString(),
-    _id: userId
+    _id
   });
 });
 
-app.get('/api/exercise/log', (req, res) => {
-  const { userId, from, to, limit } = req.query;
+app.get('/api/users/:_id/logs', (req, res) => {
+  const { _id } = req.params;
+  const { from, to, limit } = req.query;
 
-  // Verificar si el usuario existe
-  const user = database.users.find(user => user._id === userId);
+  // Check if the user exists
+  const user = database.users.find(user => user._id === _id);
   if (!user) {
     return res.send('User not found');
   }
 
   let exercises = database.exercises.filter(exercise => exercise.username === user.username);
 
-  // Filtrar por fechas (from y to)
+  // Filter by dates (from and to)
   if (from) {
     exercises = exercises.filter(exercise => exercise.date >= new Date(from));
   }
@@ -88,7 +94,7 @@ app.get('/api/exercise/log', (req, res) => {
     exercises = exercises.filter(exercise => exercise.date <= new Date(to));
   }
 
-  // Limitar cantidad de ejercicios (limit)
+  // Limit the number of exercises (limit)
   if (limit) {
     exercises = exercises.slice(0, parseInt(limit));
   }
@@ -96,7 +102,7 @@ app.get('/api/exercise/log', (req, res) => {
   res.json({
     username: user.username,
     count: exercises.length,
-    _id: userId,
+    _id,
     log: exercises.map(exercise => ({
       description: exercise.description,
       duration: exercise.duration,
@@ -105,7 +111,7 @@ app.get('/api/exercise/log', (req, res) => {
   });
 });
 
-// Generar un ID único
+// Generate a unique ID
 function generateId() {
   return Math.random().toString(36).substr(2, 9);
 }
